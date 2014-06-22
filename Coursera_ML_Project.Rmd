@@ -1,0 +1,81 @@
+---
+title: "Coursera ML Project"
+author: "Camille Roussel"
+date: "June 22, 2014"
+output: html_document
+---
+# Machine Learning Project
+Based on work and data from <http://groupware.les.inf.puc-rio.br/har>
+
+## Setup
+```{r setup, message=FALSE}
+library(caret)
+library(randomForest)
+set.seed(42)
+```
+
+## Prepare the data.
+I made a decision to drop any columns that where primarily NA. I could have tried boosting these columns if the model was not accurate enough but did not see the need for this case.
+```{r loaddata}
+data <- read.csv('data/pml-training.csv', na.strings=c('#DIV/0!', 'NA'))
+
+# Remove low signal data
+names <- as.data.frame(sapply(data, function(x){sum(is.na(x)) / length(x)}))
+names$name <- row.names(names)
+names <- names[names[1] < .5,][[2]]
+data <- data[,names]
+data <- data[,c(-1, -3:-5)]
+```
+
+## Data slicing and sampling
+The full data is too large to run on my simple laptop so we will randomly sample it to pull a reasonable subset. This subset is split into training and testing data.
+```{r dataslice}
+# Data slice with sampling (for reasonable run times)
+data <- data[sample(1:nrow(data), 8000),]
+inTrain <- createDataPartition(y=data$classe, p=.75, list=F)
+data.train <- data[inTrain,]
+data.test <- data[-inTrain,]
+```
+
+## Model fit
+A random tree model was chosen based on the original teams work.
+```{r model}
+# Model
+fit.rf <- train(classe~., data=data.train, method='rf', proxy=TRUE)
+```
+
+## Predictions
+We use our model to run predictions against our testing data we split of earlier. We compare these results against actual.
+```{r predictions}
+pred <- predict(fit.rf, data.test)
+data.test$correct <- pred==data.test$classe
+table(pred, data.test$classe)
+```
+
+## Error Rate
+The out of sample error rate from the model is presented along with our estimated out of sample error rate from our testing cross sample.
+```{r OOB}
+fit.rf$finalModel
+paste0('Estimated OOB: ', 
+       round((1-(sum(data.test$correct)/length(data.test$correct)))*100, 3)
+       , '%')
+```
+
+
+## Results
+The results of our model against the original testing data is generated for submission to the class.
+```{r results}
+pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+        filename = paste0("results/problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+    write.table(x,file="results/problemset.txt",quote=FALSE,row.names=FALSE,col.names=FALSE)
+}
+
+testing <- read.csv('data/pml-testing.csv', na.strings=c('#DIV/0!', 'NA'))
+testing$classe <- predict(fit.rf, testing)
+results <- as.character(testing$class)
+pml_write_files(results)
+```

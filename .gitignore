@@ -6,3 +6,10 @@
 
 # R data files from past sessions
 .Rdata
+.Rproj.user
+Coursera_ML.Rproj
+
+# OS X
+.DS_Store
+data/.DS_Store
+results/*
